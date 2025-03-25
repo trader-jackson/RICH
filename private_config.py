@@ -1,0 +1,4 @@
+# directory
+from __future__ import annotations
+
+TUSHARE_TOKEN="d0205b6fb350e5c87364c36fbbd8cae2263ee1acdce56eb5a3a442ff"
