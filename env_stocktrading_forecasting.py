@@ -8,7 +8,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from stable_baselines.common.vec_env import DummyVecEnv
-from Transformer.models.transformer import Transformer_base as PredictionModel
+# from Transformer.models.transformer import Transformer_base as PredictionModel
 
 import torch
 from collections import OrderedDict
@@ -37,20 +37,19 @@ class StockTradingEnv(gym.Env):
         temporal_feature_list,
         additional_list,
         time_window_start, # should be a list
-        short_prediction_model_path = None,
-        long_prediction_model_path = None,
+        # short_prediction_model_path = None,
+        # long_prediction_model_path = None,
         episode_length=1000,
         temporal_len=60,
         figure_path='results/figure',
         logs_path='results/logs',
         csv_path = 'results/csv',
         mode="train",
-        hidden_channel=4,
+        # hidden_channel=4,
         make_plots=True,
         print_verbosity=1,
         initial=True,
         model_name="",
-        iteration="",
         device='cuda:0',
         print_additional_flag=0,
     ):

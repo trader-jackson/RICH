@@ -29,7 +29,7 @@ class FeatureEngineer:
     def __init__(
         self,
         use_technical_indicator=True,
-        tech_indicator_list=config.INDICATORS,
+        tech_indicator_list=config.TECHICAL_INDICATORS,
         use_vix=False,
         use_turbulence=False,
         user_defined_feature=False,
@@ -136,6 +136,7 @@ class FeatureEngineer:
         df["dhigh"] = df.groupby("ticker")["high"].diff()
         df["dlow"] = df.groupby("ticker")["low"].diff()
         df["dclose"] = df.groupby("ticker")["close"].diff()
+        df["dvolume"] = df.groupby("ticker")["volume"].diff()
         return df
     
 

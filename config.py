@@ -18,7 +18,7 @@ TEST_END_DATE = "2024-12-29"
 
 # stockstats technical indicator column names
 # check https://pypi.org/project/stockstats/ for different names
-INDICATORS = [
+TECHICAL_INDICATORS = [
     "macd",
     "boll_ub",
     "boll_lb",
@@ -28,6 +28,20 @@ INDICATORS = [
     "close_30_sma",
     "close_60_sma",
 ]
+TEMPORAL_FEATURE = [
+    'open', 
+    'close', 
+    'high', 
+    'low', 
+    'volume', 
+    'dopen', 
+    'dclose', 
+    'dhigh', 
+    'dlow', 
+    'dvolume'
+]
+
+
 
 
 # Model Parameters
