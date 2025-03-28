@@ -1,23 +1,24 @@
 # DRL models from Stable Baselines 3
 
 import time
-import os
+
 import numpy as np
 import pandas as pd
-from stable_baselines3 import SAC, TD3, PPO, A2C, DDPG
-from stable_baselines3.common.callbacks import BaseCallback, EvalCallback, CallbackList
-from stable_baselines3.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
-from stable_baselines3.common.vec_env import DummyVecEnv
-from stable_baselines3.common.monitor import Monitor
-import config
+from MySAC import config
+from MySAC.SAC.MAE_SAC import SAC as SAC_MAE
+import os
+from stable_baselines.common.callbacks import BaseCallback, EvalCallback, CallbackList
+from stable_baselines.common.noise import (
+    NormalActionNoise,
+    OrnsteinUhlenbeckActionNoise,
+)
+from stable_baselines.common.vec_env import DummyVecEnv
+from stable_baselines.common.results_plotter import load_results, ts2xy, plot_results
 
-MODELS = {
-    "a2c": A2C,
-    "ddpg": DDPG,
-    "td3": TD3,
-    "sac": SAC,
-    "ppo": PPO
-}
+
+
+
+MODELS = {"maesac": SAC_MAE}
 
 MODEL_KWARGS = {x: config.__dict__[f"{x.upper()}_PARAMS"] for x in MODELS.keys()}
 
@@ -130,6 +131,7 @@ class DRLAgent:
             model_kwargs["action_noise"] = NOISE[model_kwargs["action_noise"]](
                 mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions)
             )
+        print(model_kwargs)
         model = MODELS[model_name](
             policy=policy,
             env=self.env,

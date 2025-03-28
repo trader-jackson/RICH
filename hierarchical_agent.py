@@ -4,8 +4,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from stable_baselines.common.vec_env import DummyVecEnv
-from stable_baselines.common.noise import NormalActionNoise
+from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.noise import NormalActionNoise
+from stable_baselines3.common.monitor import Monitor
 import os
 import pickle
 
