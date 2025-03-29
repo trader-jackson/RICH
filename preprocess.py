@@ -26,7 +26,8 @@ def process_data(df: pd.DataFrame, ticker: str = None, save_path: str = None) ->
     # 初始化特征工程类
     fe = FeatureEngineer(
         use_technical_indicator=True,
-        tech_indicator_list=config.TECHICAL_INDICATORS,
+        # tech_indicator_list=config.TECHICAL_INDICATORS,
+        tech_indicator_list=[],
         use_vix=False,
         use_turbulence=False,
         user_defined_feature=True
@@ -162,26 +163,27 @@ def main():
     """主函数，用于处理所有市场的数据"""
     # 设置数据目录
     base_data_dir = os.path.join('data')
-    
+    from config import TRAIN_START_DATE,TEST_END_DATE
     # 处理沪深300数据
-    hs300_raw_dir = os.path.join(base_data_dir, 'cn_stocks', 'hs300', 'raw')
-    hs300_processed_dir = os.path.join(base_data_dir, 'cn_stocks', 'hs300', 'preprocessed')
+    
+    hs300_raw_dir = os.path.join(base_data_dir, 'cn_stocks', 'sse50',f'raw_{TRAIN_START_DATE}-{TEST_END_DATE}')
+    hs300_processed_dir = os.path.join(base_data_dir, 'cn_stocks', 'sse50', f'preprocessed_{TRAIN_START_DATE}-{TEST_END_DATE}')
     
     if os.path.exists(hs300_raw_dir):
         print('处理沪深300数据...')
         process_market_data(hs300_raw_dir, save_dir=hs300_processed_dir)
     
     # 处理道琼斯30数据
-    dow30_raw_dir = os.path.join(base_data_dir, 'us_stocks', 'dow30', 'raw')
-    dow30_processed_dir = os.path.join(base_data_dir, 'us_stocks', 'dow30', 'processed')
+    dow30_raw_dir = os.path.join(base_data_dir, 'us_stocks', 'dow30', f'raw_{TRAIN_START_DATE}-{TEST_END_DATE}')
+    dow30_processed_dir = os.path.join(base_data_dir, 'us_stocks', 'dow30', f'preprocessed_{TRAIN_START_DATE}-{TEST_END_DATE}')
     
     if os.path.exists(dow30_raw_dir):
         print('处理道琼斯30数据...')
         process_market_data(dow30_raw_dir, save_dir=dow30_processed_dir)
     
     # 处理纳斯达克100数据
-    nasdaq100_raw_dir = os.path.join(base_data_dir, 'us_stocks', 'nasdaq100', 'raw')
-    nasdaq100_processed_dir = os.path.join(base_data_dir, 'us_stocks', 'nasdaq100', 'processed')
+    nasdaq100_raw_dir = os.path.join(base_data_dir, 'us_stocks', 'nasdaq100', f'raw_{TRAIN_START_DATE}-{TEST_END_DATE}')
+    nasdaq100_processed_dir = os.path.join(base_data_dir, 'us_stocks', 'nasdaq100', f'preprocessed_{TRAIN_START_DATE}-{TEST_END_DATE}')
     
     if os.path.exists(nasdaq100_raw_dir):
         print('处理纳斯达克100数据...')

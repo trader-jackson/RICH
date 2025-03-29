@@ -14,7 +14,7 @@ EVAL_START_DATE = "2021-01-01"
 EVAL_END_DATE = "2022-12-31"
 
 TEST_START_DATE = "2023-01-01"
-TEST_END_DATE = "2024-12-29"
+TEST_END_DATE = "2024-12-31"
 
 # stockstats technical indicator column names
 # check https://pypi.org/project/stockstats/ for different names

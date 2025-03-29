@@ -4,16 +4,17 @@ from hmmlearn.hmm import GaussianHMM
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
+from sklearn.mixture import GaussianMixture
 import matplotlib.pyplot as plt
 from collections import Counter
 import pickle
 import os
 
 class RegimeDetector:
-    """A class for detecting market regimes using either HMM or clustering methods.
+    """A class for detecting market regimes using HMM, GMM or clustering methods.
     
     This class implements methods to identify different market regimes (bull, bear, stable, etc.)
-    using either Hidden Markov Models or clustering techniques on historical market data.
+    using Hidden Markov Models, Gaussian Mixture Models, or clustering techniques on historical market data.
     """
     
     def __init__(self, n_regimes=4, method='hmm', window_size=252, step_size=21):
@@ -23,13 +24,13 @@ class RegimeDetector:
         Parameters:
         -----------
         n_regimes : int, default=4
-            Number of regimes to detect (e.g., bull, bear, stable, volatile)
+            Number of regimes to detect.
         method : str, default='hmm'
-            Method to use for regime detection ('hmm' or 'kmeans')
+            Method to use for regime detection ('hmm', 'gmm', or 'kmeans').
         window_size : int, default=252
-            Size of the rolling window for feature calculation (252 trading days ≈ 1 year)
+            Size of the rolling window for feature calculation (252 trading days ≈ 1 year).
         step_size : int, default=21
-            Step size for sliding window (21 trading days ≈ 1 month)
+            Step size for sliding window (21 trading days ≈ 1 month).
         """
         self.n_regimes = n_regimes
         self.method = method.lower()
@@ -39,13 +40,13 @@ class RegimeDetector:
         self.scaler = StandardScaler()
         self.regime_labels = None
         self.regime_mapping = None  # For mapping numerical labels to meaningful names
-        self.pca = None  # For PCA on the features
+        self.pca = None  # For PCA on the features if needed
         
     def _prepare_features(self, df):
         """
         Prepare features for regime detection.
         
-        In this simplified version we only compute rolling mean and std on log returns.
+        Here we compute rolling mean and standard deviation of log returns.
         
         Parameters:
         -----------
@@ -77,7 +78,7 @@ class RegimeDetector:
         # Scale features
         X_scaled = self.scaler.fit_transform(X)
         
-        # Apply PCA to reduce noise; reduce to min(n_features, n_regimes) components.
+        # Apply PCA to reduce noise; here reduce to min(n_features, n_regimes) components.
         n_components = min(len(features), self.n_regimes)
         self.pca = PCA(n_components=n_components)
         X_pca = self.pca.fit_transform(X_scaled)
@@ -91,12 +92,12 @@ class RegimeDetector:
         Parameters:
         -----------
         df : pandas.DataFrame
-            DataFrame containing price data with columns ['date', 'open', 'high', 'low', 'close', 'volume']
+            DataFrame containing price data with columns like ['date', 'open', 'high', 'low', 'close', 'volume'].
             
         Returns:
         --------
         self : RegimeDetector
-            The fitted detector
+            The fitted detector.
         df : pandas.DataFrame
             DataFrame with regime labels added.
         """
@@ -111,6 +112,14 @@ class RegimeDetector:
             )
             self.model.fit(X)
             regimes = self.model.predict(X)
+        elif self.method == 'gmm':
+            self.model = GaussianMixture(
+                n_components=self.n_regimes, 
+                random_state=42,
+                n_init=20
+            )
+            self.model.fit(X)
+            regimes = self.model.predict(X)
         elif self.method == 'kmeans':
             self.model = KMeans(
                 n_clusters=self.n_regimes, 
@@ -119,7 +128,7 @@ class RegimeDetector:
             )
             regimes = self.model.fit_predict(X)
         else:
-            raise ValueError(f"Unknown method: {self.method}. Use 'hmm' or 'kmeans'.")
+            raise ValueError(f"Unknown method: {self.method}. Use 'hmm', 'gmm' or 'kmeans'.")
         
         df_clean['regime'] = regimes
         self.regime_labels = df_clean[['regime']]
@@ -192,10 +201,10 @@ class RegimeDetector:
             raise ValueError("Model not fitted. Call fit() first.")
         
         X, df_clean = self._prepare_features(df)
-        if self.method == 'hmm':
+        if self.method in ['hmm', 'gmm', 'kmeans']:
             regimes = self.model.predict(X)
-        else:  # kmeans
-            regimes = self.model.predict(X)
+        else:
+            raise ValueError("Unknown method.")
         df_clean['regime'] = regimes
         
         return df_clean
@@ -220,10 +229,10 @@ class RegimeDetector:
         features = np.array([state['roll_mean'], state['roll_std']]).reshape(1, -1)
         features_scaled = self.scaler.transform(features)
         features_pca = self.pca.transform(features_scaled)
-        if self.method == 'hmm':
+        if self.method in ['hmm', 'gmm', 'kmeans']:
             regime = self.model.predict(features_pca)[0]
         else:
-            regime = self.model.predict(features_pca)[0]
+            raise ValueError("Unknown method.")
         return regime
     
     def get_regime_name(self, regime_id):
@@ -246,12 +255,10 @@ class RegimeDetector:
     
     def rolling_window_clustering(self, df, window_size=100, step=20, n_clusters=4):
         """
-        Use a rolling window approach to compute trend and volatility features,
-        and then cluster the windows based on these features.
+        Use a rolling window approach to compute the trend feature, and then cluster the windows based on this feature.
         
         For each window:
           - Trend = (end_price - start_price) / start_price
-          - Volatility = standard deviation of daily returns within the window.
         
         Parameters:
         -----------
@@ -267,7 +274,7 @@ class RegimeDetector:
         Returns:
         --------
         window_df : pandas.DataFrame
-            DataFrame with computed trend, volatility, and assigned cluster for each window.
+            DataFrame with computed trend and assigned cluster for each window.
         kmeans : KMeans
             The fitted KMeans clustering model.
         """
@@ -285,21 +292,17 @@ class RegimeDetector:
             end_price = window['close'].iloc[-1]
             trend = (end_price - start_price) / start_price
             
-            # Calculate volatility: standard deviation of daily returns in the window
-            returns = window['close'].pct_change().dropna()
-            volatility = returns.std()
-            
-            features.append([trend, volatility])
+            features.append([trend])  # Only using trend
             indices.append((start, end))
         
         features = np.array(features)
         
-        # Cluster the windows based on trend and volatility
+        # Cluster the windows based on trend only
         kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=20)
         labels = kmeans.fit_predict(features)
         
         # Store results in a DataFrame
-        window_df = pd.DataFrame(features, columns=['trend', 'volatility'])
+        window_df = pd.DataFrame(features, columns=['trend'])
         window_df['cluster'] = labels
         window_df['start_idx'] = [idx[0] for idx in indices]
         window_df['end_idx'] = [idx[1] for idx in indices]
@@ -356,71 +359,115 @@ class RegimeDetector:
         detector.pca = data.get('pca', None)
         return detector
 
-def label_data_with_regimes(df, save_path=None, method='hmm', n_regimes=4):
+def save_regime_segments(df, col, method_name, output_dir="regime_label"):
     """
-    Label data with market regimes and optionally save the labeled data.
+    Group the DataFrame by contiguous segments based on the column (e.g., 'regime')
+    and save the start and end dates for each segment into CSV files.
     
     Parameters:
     -----------
     df : pandas.DataFrame
-        DataFrame containing price data.
-    save_path : str, optional
-        Path to save the labeled data.
-    method : str, default='hmm'
-        Method to use for regime detection ('hmm' or 'kmeans').
-    n_regimes : int, default=4
-        Number of regimes to detect.
-        
-    Returns:
-    --------
-    pandas.DataFrame
-        DataFrame with regime labels.
-    RegimeDetector
-        The fitted detector.
+        DataFrame that contains at least 'date' and the specified column.
+    col : str
+        The column name to group by (e.g., 'regime').
+    method_name : str
+        A name to include in the filename (e.g., "gmm").
+    output_dir : str, default="regime_label"
+        The directory where files will be saved.
     """
-    detector = RegimeDetector(n_regimes=n_regimes, method=method)
-    detector, labeled_df = detector.fit(df)
+    os.makedirs(output_dir, exist_ok=True)
+    # Ensure data is sorted by date
+    df = df.sort_values('date').reset_index(drop=True)
+    # Create a grouping variable that increments when the regime changes
+    df['segment_group'] = (df[col].shift() != df[col]).cumsum()
+    segments = df.groupby(['segment_group', col]).agg(
+        start_date=('date', 'first'),
+        end_date=('date', 'last'),
+        count=('date', 'count')
+    ).reset_index()
     
-    if save_path:
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        labeled_df.to_csv(save_path, index=False)
-        detector_path = os.path.join(os.path.dirname(save_path), 'regime_detector.pkl')
-        detector.save(detector_path)
-    
-    return labeled_df, detector
+    # Save one CSV file per regime label containing its segments
+    for regime in segments[col].unique():
+        regime_segments = segments[segments[col] == regime]
+        out_file = os.path.join(output_dir, f"{method_name}_regime_{regime}_segments.csv")
+        regime_segments[['start_date', 'end_date', 'count']].to_csv(out_file, index=False)
+        print(f"Saved {method_name} regime {regime} segments to {out_file}")
 
 if __name__ == "__main__":
     import yfinance as yf
+    import matplotlib.dates as mdates
+    from statistics import mode, StatisticsError
     
-    # Example usage: load data (ensure your CSV has 'date' and 'close' columns)
+    # Load data (ensure your CSV has 'date' and 'close' columns)
     df = pd.read_csv('market_index/raw/NASDAQ.csv')
     df['date'] = pd.to_datetime(df['date'])
     
-    # Use the original regime detection for demonstration
-    detector = RegimeDetector(n_regimes=4, method='hmm')
-    detector, labeled_df = detector.fit(df)
+    # ---------------------------
+    # GMM method regime detection
+    # ---------------------------
+    gmm_detector = RegimeDetector(n_regimes=4, method='gmm')
+    gmm_detector, gmm_labeled_df = gmm_detector.fit(df)
     
+    # Instead of saving every date, group contiguous regimes into segments and record start/end dates
+    save_regime_segments(gmm_labeled_df, col='regime', method_name="gmm")
+    
+    # (Optional) Plot the time series colored by GMM regime assignment
     plt.figure(figsize=(16, 8))
-    for regime in range(detector.n_regimes):
-        mask = labeled_df['regime'] == regime
-        plt.plot(labeled_df.index[mask], labeled_df['close'][mask], '.', 
-                 label=f"{detector.get_regime_name(regime)} (Regime {regime})")
-    plt.title('NASDAQ Market Regimes')
-    plt.xlabel('Index')
+    for regime in range(gmm_detector.n_regimes):
+        mask = gmm_labeled_df['regime'] == regime
+        plt.plot(gmm_labeled_df['date'][mask], gmm_labeled_df['close'][mask], '.', 
+                 label=f"{gmm_detector.get_regime_name(regime)} (Regime {regime})")
+    plt.title('NASDAQ Market Regimes by GMM')
+    plt.xlabel('Date')
     plt.ylabel('Price')
     plt.legend()
     plt.show()
     
-    # Perform rolling window clustering based on trend and volatility
-    window_df, kmeans_model = detector.rolling_window_clustering(df, window_size=100, step=20, n_clusters=4)
-    print(window_df.head())
+    # ---------------------------
+    # Sliding Window Clustering using trend only
+    # ---------------------------
+    window_size = 100
+    step = 20
+    n_clusters = 4
+    window_df, kmeans_model = gmm_detector.rolling_window_clustering(df, window_size=window_size, step=step, n_clusters=n_clusters)
     
-    # Plot the clustering results in feature space
-    plt.figure(figsize=(10, 6))
-    scatter = plt.scatter(window_df['trend'], window_df['volatility'], 
-                          c=window_df['cluster'], cmap='viridis', s=100, edgecolors='k')
-    plt.xlabel('Trend (End Price - Start Price) / Start Price')
-    plt.ylabel('Volatility (Std of Daily Returns)')
-    plt.title('Rolling Window Clustering Based on Trend and Volatility')
-    plt.colorbar(scatter, label='Cluster')
+    # For each time step in df, assign a cluster label based on overlapping windows.
+    df_sorted = df.sort_values('date').reset_index(drop=True)
+    n = len(df_sorted)
+    cluster_assignments = []
+    for i in range(n):
+        labels_for_i = []
+        for _, row in window_df.iterrows():
+            if row['start_idx'] <= i < row['end_idx']:
+                labels_for_i.append(row['cluster'])
+        if labels_for_i:
+            try:
+                common_label = mode(labels_for_i)
+            except StatisticsError:
+                common_label = labels_for_i[0]
+            cluster_assignments.append(common_label)
+        else:
+            cluster_assignments.append(np.nan)
+    df_sorted['cluster'] = cluster_assignments
+    
+    # For the sliding window method, we can similarly group contiguous segments and save them.
+    save_regime_segments(df_sorted, col='cluster', method_name="sliding")
+    
+    # Plot the entire time series with segments colored by sliding window cluster assignment
+    df_sorted['cluster_group'] = (df_sorted['cluster'].shift() != df_sorted['cluster']).cumsum()
+    cmap = plt.get_cmap('viridis', n_clusters)
+    fig, ax = plt.subplots(figsize=(16, 8))
+    for _, group in df_sorted.groupby('cluster_group'):
+        clabel = group['cluster'].iloc[0]
+        if pd.isna(clabel):
+            continue
+        ax.plot(group['date'], group['close'], color=cmap(int(clabel)),
+                label=f"Cluster {int(clabel)}" if f"Cluster {int(clabel)}" not in ax.get_legend_handles_labels()[1] else "")
+    ax.set_title("NASDAQ Time Series Colored by Sliding Window (Trend) Cluster Assignment")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Close Price")
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+    ax.tick_params(axis='x', rotation=45)
+    ax.legend()
+    plt.tight_layout()
     plt.show()

@@ -206,7 +206,7 @@ class YahooDownloader:
                 temp_df.rename(
                     columns={
                         "Date": "date",
-                        "Adj Close": "price",
+                        "Adj Close": "adjusted price",
                         "Close": "close",
                         "High": "high",
                         "Low": "low",
@@ -292,31 +292,45 @@ class DataCollector:
                 yahoo_tickers.append(f"{stock[:-3]}.SZ")
         return yahoo_tickers
 
-    def download_hs_stocks(self, start_date: str, end_date: str, save_dir: str):
-        """下载并保存沪深300成分股数据，每只股票保存为独立的CSV文件
+    def download_se_stocks(self, start_date: str, end_date: str, save_dir: str):
+        """下载并保存上证50成分股数据，每只股票保存为独立的CSV文件
 
         参数:
             start_date: str, 开始日期，格式：YYYYMMDD
             end_date: str, 结束日期，格式：YYYY-MM-DD
             save_dir: str, 保存数据的目录
         """
-        # 获取沪深300成分股列表（Yahoo Finance格式）
-        stock_list = self.get_hs300_stocks(end_date)
-        print(f"获取到{len(stock_list)}只沪深300成分股")
-
         # 确保保存目录存在
-        raw_dir = os.path.join(save_dir,"hs300", 'raw')
-        os.makedirs(raw_dir, exist_ok=True)
+        from config import TRAIN_START_DATE,TRAIN_END_DATE
+        
+        index_save_dir = os.path.join(save_dir, "sse50", f'raw_{start_date}-{end_date}')
+        os.makedirs(index_save_dir, exist_ok=True)
+        # 获取上证50成分股列表
+        pro = ts.pro_api()
+        # 获取训练结束日期的上证50成分股
+        df = pro.index_weight(index_code='000016.SH', 
+                            start_date='20181201', end_date='20181231')
+        stock_list = df['con_code'].tolist()
+        print(f"获取到{len(stock_list)}只上证50成分股")
 
-        # 创建Yahoo下载器并下载每只股票的数据
+        # 转换股票代码格式
+        yahoo_stock_list = []
+        for stock in stock_list:
+            if stock.endswith('.SH'):
+                yahoo_stock_list.append(f"{stock[:-3]}.SS")
+            elif stock.endswith('.SZ'):
+                yahoo_stock_list.append(f"{stock[:-3]}.SZ")
+
+        # 使用Tushare下载数据
         self.yahoo_downloader = YahooDownloader(
-            start_date=start_date,
-            end_date=end_date,
-            ticker_list=stock_list
-        )
+                start_date=start_date,
+                end_date=end_date,
+                ticker_list=yahoo_stock_list
+            )
+            
+            # 下载并保存每只股票的数据
+        self.yahoo_downloader.fetch_data(save_dir=index_save_dir)
 
-        # 下载并保存每只股票的数据
-        self.yahoo_downloader.fetch_data(save_dir=raw_dir)
 
     def download_us_stocks(self, start_date: str, end_date: str, save_dir: str):
         """下载并保存道琼斯30和纳斯达克100指数成分股数据，每只股票保存为独立的CSV文件
@@ -336,7 +350,7 @@ class DataCollector:
             print(f"开始下载{index_name}指数成分股数据")
             
             # 确保保存目录存在
-            index_save_dir = os.path.join(save_dir, index_name, 'raw')
+            index_save_dir = os.path.join(save_dir, index_name, f'raw_{start_date}-{end_date}')
             os.makedirs(index_save_dir, exist_ok=True)
             
             # 创建Yahoo下载器
@@ -364,8 +378,8 @@ def main():
     downloader = DataCollector(TUSHARE_TOKEN)
     
     # 下载沪深300数据
-    hs300_save_dir = os.path.join(base_save_dir, 'cn_stocks')
-    downloader.download_hs_stocks(start_date, end_date, hs300_save_dir)
+    se50_save_dir = os.path.join(base_save_dir, 'cn_stocks')
+    downloader.download_se_stocks(start_date, end_date, se50_save_dir)
     
     # 下载美股数据
     us_save_dir = os.path.join(base_save_dir, 'us_stocks')
